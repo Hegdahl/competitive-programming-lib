@@ -1,6 +1,6 @@
 #pragma once
 
-#include <graph/flow.hpp>
+#include <graph/old_flow.hpp>
 
 #include <array>
 
