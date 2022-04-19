@@ -1,6 +1,6 @@
 #pragma once
 
-#include <sum_stack.hpp>
+#include <container/sum_stack.hpp>
 
 template<class T, class Op>
 struct SumQueue {
