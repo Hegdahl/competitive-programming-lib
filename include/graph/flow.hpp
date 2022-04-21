@@ -126,15 +126,8 @@ class Flow {
   Flow(Args &&...args) : node_name_translator(std::forward<Args>(args)...) {}
 
   struct Edge {
-    int toggle;
-    FlowType lo_hi_cap, hi_lo_cap;
-
-    FlowType &get_cap_from(int i) {
-      return i < (i ^ toggle) ? lo_hi_cap : hi_lo_cap;
-    }
-    FlowType &get_cap_to(int j) {
-      return (j ^ toggle) < j ? lo_hi_cap : hi_lo_cap;
-    }
+    int to;
+    FlowType cap;
   };
 
   std::vector<Edge> edge_list;
@@ -155,11 +148,11 @@ class Flow {
     for (int i : from) {
       for (int eid : graph[i]) {
         Edge &edge = edge_list[eid];
-        int j = i ^ edge.toggle;
+        int j = edge.to;
         if (!is_to(j)) continue;
 
-        FlowType current_flow = edge.get_cap_to(i);
-        FlowType capacity = edge.lo_hi_cap + edge.hi_lo_cap;
+        FlowType current_flow = edge_list[eid^1].cap;
+        FlowType capacity = edge.cap + current_flow;
         res.emplace_back(i, j, current_flow, capacity);
       }
     }
@@ -185,10 +178,9 @@ class Flow {
     expand_graph(std::max(from_id, to_id) + 1);
 
     graph[from_id].push_back(edge_list.size());
+    edge_list.emplace_back(Edge{to_id, weight});
     graph[to_id].push_back(edge_list.size());
-
-    Edge &e = edge_list.emplace_back(Edge{from_id ^ to_id, 0, 0});
-    e.get_cap_from(from_id) = weight;
+    edge_list.emplace_back(Edge{from_id, 0});
   }
 
   /**
@@ -271,9 +263,9 @@ class Flow {
 
       for (int eid : graph[i]) {
         Edge &edge = edge_list[eid];
-        if (!edge.get_cap_from(i)) continue;
+        if (!edge.cap) continue;
 
-        int j = i ^ edge.toggle;
+        int j = edge.to;
 
         if (!vis[j]) {
           vis[j] = vis[i] + 1;
@@ -297,7 +289,7 @@ class Flow {
         continue;
 
       for (int eid : bfs_graph_rev[j]) {
-        int i = j ^ edge_list[eid].toggle;
+        int i = edge_list[eid^1].to;
         vis[i] = 1;
         bfs_graph[i].push_back(eid);
       }
@@ -312,29 +304,33 @@ class Flow {
 
     while (bfs_graph[current].size()) {
       Edge &edge = edge_list[bfs_graph[current].back()];
-      int next = current ^ edge.toggle;
+      int next = edge.to;
 
       if (vis[next]) {
         bfs_graph[current].pop_back();
         continue;
       }
 
-      FlowType &cap = edge.get_cap_from(current);
-
-      if (!cap) {
+      if (!edge.cap) {
         bfs_graph[current].pop_back();
         continue;
       }
 
-      FlowType here = dfs(next, target, std::min(prefix_cap, cap));
+      FlowType here = dfs(next, target, std::min(prefix_cap, edge.cap));
       if (!here) {
         bfs_graph[current].pop_back();
         continue;
       }
 
-      FlowType &reverse_cap = edge.get_cap_to(current);
-      cap -= here;
-      reverse_cap += here;
+      edge.cap -= here;
+      edge_list[bfs_graph[current].back()^1].cap += here;
+
+      if (!edge.cap) {
+        bfs_graph[current].pop_back();
+        if (bfs_graph[current].size() == 0)
+          vis[current] = 1;
+      }
+
       return here;
     }
 

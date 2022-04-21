@@ -19,9 +19,6 @@ int main() {
     bm.add_edge(i, j);
   }
 
-  std::cout << bm.compute_matching_size() << '\n';
-  return 0;
-
   auto matching = bm.get_matching();
   std::cout << matching.size() << '\n';
   for (auto [i, j] : matching)
