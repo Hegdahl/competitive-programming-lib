@@ -138,7 +138,7 @@ class Flow {
   };
 
   std::vector<Edge> edge_list;
-  std::vector<std::vector<int>> graph, bfs_graph;
+  std::vector<std::vector<int>> graph, bfs_graph, bfs_graph_rev;
   std::vector<int> vis;
 
   template <class... Args>
@@ -148,10 +148,8 @@ class Flow {
   }
 
   template <class... Args>
-  std::vector<std::tuple<int, int, FlowType, FlowType>> get_edge_group(
-      Args &...args) {
-    auto [from, is_to] = node_name_translator.get_edge_group_descriptor(
-        std::forward<Args>(args)...);
+  std::vector<std::tuple<int, int, FlowType, FlowType>> get_edge_group(int x, int y) {
+    auto [from, is_to] = node_name_translator.get_edge_group_descriptor(x, y);
 
     std::vector<std::tuple<int, int, FlowType, FlowType>> res;
     for (int i : from) {
@@ -160,7 +158,7 @@ class Flow {
         int j = i ^ edge.toggle;
         if (!is_to(j)) continue;
 
-        FlowType current_flow = i < j ? edge.lo_hi_cap : edge.lo_hi_cap;
+        FlowType current_flow = edge.get_cap_to(i);
         FlowType capacity = edge.lo_hi_cap + edge.hi_lo_cap;
         res.emplace_back(i, j, current_flow, capacity);
       }
@@ -210,9 +208,12 @@ class Flow {
 
     vis.assign(graph.size(), 0);
 
+    int steps = 0;
+
     FlowType ans = 0;
     FlowType to_add;
-    while ((to_add = blocking_flow(source_id, sink_id))) ans += to_add;
+    while ((to_add = blocking_flow(source_id, sink_id))) ans += to_add, ++steps;
+
     return ans;
   }
 
@@ -233,11 +234,14 @@ class Flow {
    */
   FlowType blocking_flow(int source_id, int sink_id) {
     init_bfs_graph(source_id, sink_id);
+
+    int steps = 0;
+
     FlowType ans = 0;
     FlowType to_add;
     while ((to_add =
                 dfs(source_id, sink_id, std::numeric_limits<FlowType>::max())))
-      ans += to_add;
+      ans += to_add, ++steps;
 
     return ans;
   }
@@ -245,13 +249,26 @@ class Flow {
   void init_bfs_graph(int source_id, int sink_id) {
     static std::vector<int> queue;
 
+    if (bfs_graph.size() < graph.size()) {
+      bfs_graph.assign(graph.size(), {});
+      bfs_graph_rev.assign(graph.size(), {});
+    }
+
+    for (int i : queue) {
+      bfs_graph[i].clear();
+      bfs_graph_rev[i].clear();
+    }
+
     queue.assign({source_id});
-    bfs_graph.assign(graph.size(), {});
+
     vis.assign(graph.size(), 0);
     vis[source_id] = 1;
 
     for (int qq = 0; qq < (int)queue.size(); ++qq) {
       int i = queue[qq];
+      if (i == sink_id)
+        break;
+
       for (int eid : graph[i]) {
         Edge &edge = edge_list[eid];
         if (!edge.get_cap_from(i)) continue;
@@ -264,11 +281,30 @@ class Flow {
         }
         if (vis[i] + 1 != vis[j]) continue;
 
+        bfs_graph_rev[j].push_back(eid);
+        //bfs_graph[i].push_back(eid);
+      }
+    }
+
+    for (int i : queue)
+      vis[i] = 0;
+    vis[sink_id] = 1;
+
+    for (int qq = (int)queue.size()-1; qq >= 0; --qq) {
+      int j = queue[qq];
+
+      if (!vis[j])
+        continue;
+
+      for (int eid : bfs_graph_rev[j]) {
+        int i = j ^ edge_list[eid].toggle;
+        vis[i] = 1;
         bfs_graph[i].push_back(eid);
       }
     }
 
-    vis.assign(graph.size(), 0);
+    for (int i : queue)
+      vis[i] = 0;
   }
 
   FlowType dfs(int current, int target, FlowType prefix_cap) {

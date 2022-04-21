@@ -1,66 +1,77 @@
-#include <local_assertion.hpp>
+#include <array>
 #include <graph/flow.hpp>
-#include<array>
-#include<vector>
+#include <local_assertion.hpp>
+#include <vector>
+
 /**
  * @brief computes the following :
  *    maximum matching on bipartite graph
  *    minimum vertex cover of bipartite graph
-*/
-struct Bipartite_matcher{
-    Flow<int> internal_flow;
-    int n_l, n_r;
-    Bipartite_matcher(int n) : n_l(n), n_r(n), internal_flow(1, n, n, 1) {}
-    Bipartite_matcher(int n_l, int n_r) : n_l(n_l), n_r(n_r), internal_flow(1, n_l, n_r, 1) {}
-    void add_edge(int u, int v){
-        internal_flow(1, u)(2, v) = 1; 
+ */
+struct BipartiteMatcher {
+  Flow<int> internal_flow;
+  int n_l, n_r;
+
+  BipartiteMatcher(int n_l, int n_r)
+      : n_l(n_l), n_r(n_r), internal_flow(1, n_l, n_r, 1) {
+    for (int i = 0; i < n_l; i++) internal_flow(0, 0)(1, i) = 1;
+    for (int i = 0; i < n_r; i++) internal_flow(2, i)(3, 0) = 1;
+  }
+
+  BipartiteMatcher(int n) : BipartiteMatcher(n, n) {}
+
+  void add_edge(int u, int v) { internal_flow(1, u)(2, v) = 1; }
+
+  int compute_matching_size() { return internal_flow(0, 0)(3, 0).max_flow(); }
+
+  std::vector<std::array<int, 2>> get_matching() {
+    int matching_size = compute_matching_size();
+
+    std::vector<std::array<int, 2>> matching(matching_size);
+    auto it = matching.begin();
+
+    for (const auto &[u, v, flow, cap] : internal_flow.get_edge_group(1, 2))
+      if (flow > 0) *(it++) = std::array<int, 2>({u, v});
+
+    for (auto &e : matching)
+      for (auto &v : e) v = internal_flow.node_name_translator.from_id(v)[1];
+
+    return matching;
+  }
+
+  std::vector<int> min_vertex_cover() {
+    auto M = get_matching();
+    std::vector<int> cover(M.size());
+    std::vector<uint8_t> vis(n_l + n_r);
+    for (auto &[u, v] : M) vis[u] = 1;
+    std::vector<std::vector<int>> g(n_l + n_r);
+    for (auto &[u, v, flow, cap] : internal_flow.get_edge_group(1, 2)) {
+      if (flow)
+        g[v + n_l].push_back(u);
+      else
+        g[u].push_back(v + n_l);
     }
-    int compute_matching_size(){
-        //TO DO add edges from source and sink
-        return internal_flow.max_flow();
+
+    std::vector<int> queue;
+
+    for (int i = 0; i < n_l; i++)
+      if (vis[i]) queue.push_back(i);
+
+    for (int qq = 0; qq < (int)queue.size(); ++qq) {
+      int u = queue[qq];
+      for (auto &v : g[u]) {
+        if (vis[v]) continue;
+        vis[v] = 1;
+        queue.push_back(v);
+      }
     }
-    std::vector<std::array<int, 2>> get_matching(){
-        std::vector<std::array<int, 2>> matchings;
+
+    for (auto &[u, v] : M) {
+      if (vis[v])
+        cover.push_back(v);
+      else
+        cover.push_back(u);
     }
+    return cover;
+  }
 };
-
-// should we have custom assertion system that is only enabled locally?
-// 
-//seems pretty easy I think, why not
-// basically it's just this:
-// you can assume any node exists
-// then just (x, y, z, w) will refer to some node
-// with any number of indices
-//wait why would you do that?
-//I think it makes more sense {layer number, index_in_layer}
-//tho your idea is superset of my idea
-// ^ but worse constant factor. but i think the constant won't matter
-// since flow is slow compared to lookups in map of arrays
-//log * num_layer is still bad imo 
-//maybe y
-
-// it's log * number of dimensions, not log * number of layers
-//yea sorry thats what I meant, thats still pretty bad imo
-//you can do in linear in number of nodes, if you assume it to behave like nested vectors
-//i.e. nested layers, for 3d (x, y, z) find all nodes mapped to by x which, in some prefix [1, k]
-//then it reduces to k 2d cases
-//but this won't allow you to use x = 0, 1, 1e9
-//its essentially indexing by radix sort on (x, y, z)
-
-// i think i can abstract out this translation thing
-// to have the best of both worlds
-//ok I'm watching :blob_popcorn:
-
-// just assume it works like you thought it would initially :thumbsup:
-//ok trust
-// with this mapping idea we actually don't need to predefine
-// size of graph
-
-//take size of layer = maximum index + 1(if 0 indexed)?
-//do you use 1 based indexing?
-// ^ up to user
-// if i open and close files, do they open and close for you too?
-//no, it doesn't
-//ah I see what you mean, we can have them built dynamically
-// ^^
-//I will need to see your impl a bit, to see how to do, that, I will edit parts accordingly
