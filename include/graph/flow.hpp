@@ -1,9 +1,10 @@
 #pragma once
 
+#include <local_assertion.hpp>
+
 #include <algorithm>
 #include <array>
 #include <limits>
-#include <local_assertion.hpp>
 #include <numeric>
 #include <tuple>
 #include <vector>
@@ -131,8 +132,11 @@ class Flow {
   };
 
   std::vector<Edge> edge_list;
-  std::vector<std::vector<int>> graph, bfs_graph, bfs_graph_rev;
-  std::vector<int> vis;
+  std::vector<std::vector<int>> graph;
+  std::vector<int> bfs_graph, bfs_graph_outdegree, bfs_graph_start, queue,
+      used_edge;
+
+  std::vector<int> vis, dist;
 
   template <class... Args>
   NodeReference operator()(Args &&...args) {
@@ -141,7 +145,8 @@ class Flow {
   }
 
   template <class... Args>
-  std::vector<std::tuple<int, int, FlowType, FlowType>> get_edge_group(int x, int y) {
+  std::vector<std::tuple<int, int, FlowType, FlowType>> get_edge_group(int x,
+                                                                       int y) {
     auto [from, is_to] = node_name_translator.get_edge_group_descriptor(x, y);
 
     std::vector<std::tuple<int, int, FlowType, FlowType>> res;
@@ -151,7 +156,7 @@ class Flow {
         int j = edge.to;
         if (!is_to(j)) continue;
 
-        FlowType current_flow = edge_list[eid^1].cap;
+        FlowType current_flow = edge_list[eid ^ 1].cap;
         FlowType capacity = edge.cap + current_flow;
         res.emplace_back(i, j, current_flow, capacity);
       }
@@ -197,21 +202,29 @@ class Flow {
    */
   FlowType max_flow(int source_id, int sink_id) {
     expand_graph(std::max(source_id, sink_id) + 1);
-
-    vis.assign(graph.size(), 0);
+    source_id_ = source_id;
+    sink_id_ = sink_id;
 
     int steps = 0;
 
     FlowType ans = 0;
     FlowType to_add;
-    while ((to_add = blocking_flow(source_id, sink_id))) ans += to_add, ++steps;
+    while ((to_add = blocking_flow())) ans += to_add, ++steps;
 
     return ans;
   }
 
  private:
+  int source_id_, sink_id_;
+
   void expand_graph(int new_size) {
-    while ((int)graph.size() < new_size) graph.emplace_back();
+    while ((int)graph.size() < new_size) {
+      graph.emplace_back();
+      bfs_graph_outdegree.emplace_back();
+      bfs_graph_start.emplace_back();
+      vis.emplace_back();
+      dist.emplace_back();
+    }
   }
 
   /**
@@ -219,116 +232,131 @@ class Flow {
    * until there are no unsaturated
    * paths left inside the bfs graph.
    *
-   * @param source_id The id of the node to start from
-   * @param sink_id   The id of the node to end at
    * @return The maximum flow without using edges
    *         outside the BFS graph.
    */
-  FlowType blocking_flow(int source_id, int sink_id) {
-    init_bfs_graph(source_id, sink_id);
+  FlowType blocking_flow() {
+    init_bfs_graph();
 
     int steps = 0;
 
     FlowType ans = 0;
     FlowType to_add;
     while ((to_add =
-                dfs(source_id, sink_id, std::numeric_limits<FlowType>::max())))
+                dfs(source_id_, std::numeric_limits<FlowType>::max())))
       ans += to_add, ++steps;
 
     return ans;
   }
 
-  void init_bfs_graph(int source_id, int sink_id) {
-    static std::vector<int> queue;
+  void init_bfs_graph() {
+    reset_bfs_graph();
+    forward_bfs();
+    backward_bfs();
+    load_edges();
+  }
 
-    if (bfs_graph.size() < graph.size()) {
-      bfs_graph.assign(graph.size(), {});
-      bfs_graph_rev.assign(graph.size(), {});
-    }
-
+  void reset_bfs_graph() {
     for (int i : queue) {
-      bfs_graph[i].clear();
-      bfs_graph_rev[i].clear();
+      vis[i] = 0;
+      dist[i] = 0;
+      bfs_graph_outdegree[i] = 0;
     }
+    queue.clear();
+  }
 
-    queue.assign({source_id});
-
-    vis.assign(graph.size(), 0);
-    vis[source_id] = 1;
+  void forward_bfs() {
+    queue.push_back(source_id_);
+    vis[source_id_] = 1;
 
     for (int qq = 0; qq < (int)queue.size(); ++qq) {
       int i = queue[qq];
-      if (i == sink_id)
-        break;
+      if (i == sink_id_) break;
 
       for (int eid : graph[i]) {
         Edge &edge = edge_list[eid];
         if (!edge.cap) continue;
-
         int j = edge.to;
 
-        if (!vis[j]) {
-          vis[j] = vis[i] + 1;
-          queue.push_back(j);
-        }
-        if (vis[i] + 1 != vis[j]) continue;
+        if (vis[j]) continue;
 
-        bfs_graph_rev[j].push_back(eid);
-        //bfs_graph[i].push_back(eid);
+        vis[j] = 1;
+        dist[j] = dist[i] + 1;
+        queue.push_back(j);
       }
     }
-
-    for (int i : queue)
-      vis[i] = 0;
-    vis[sink_id] = 1;
-
-    for (int qq = (int)queue.size()-1; qq >= 0; --qq) {
-      int j = queue[qq];
-
-      if (!vis[j])
-        continue;
-
-      for (int eid : bfs_graph_rev[j]) {
-        int i = edge_list[eid^1].to;
-        vis[i] = 1;
-        bfs_graph[i].push_back(eid);
-      }
-    }
-
-    for (int i : queue)
-      vis[i] = 0;
   }
 
-  FlowType dfs(int current, int target, FlowType prefix_cap) {
-    if (current == target) return prefix_cap;
+  void backward_bfs() {
+    vis[sink_id_] = 0;
+    bfs_graph_start[queue.back()] = 0;
 
-    while (bfs_graph[current].size()) {
-      Edge &edge = edge_list[bfs_graph[current].back()];
+    for (int qq = (int)queue.size() - 1; qq >= 0; --qq) {
+      int j = queue[qq];
+
+      if (qq + 1 < (int)queue.size()) {
+        int nxt = queue[qq + 1];
+        bfs_graph_start[j] = bfs_graph_start[nxt] + bfs_graph_outdegree[nxt];
+        bfs_graph_outdegree[nxt] = 0;
+      }
+
+      if (vis[j]) continue;
+
+      for (int eid : graph[j]) {
+        if (!edge_list[eid ^ 1].cap) continue;
+        int i = edge_list[eid].to;
+        if (dist[i] + 1 != dist[j]) continue;
+
+        vis[i] = 0;
+        ++bfs_graph_outdegree[i];
+        used_edge.push_back(eid);
+      }
+    }
+  }
+
+  void load_edges() {
+    bfs_graph.resize(bfs_graph_start[queue.front()] +
+                     bfs_graph_outdegree[queue.front()]);
+    bfs_graph_outdegree[queue.front()] = 0;
+
+    while (used_edge.size()) {
+      int rev_eid = used_edge.back();
+      used_edge.pop_back();
+      int i = edge_list[rev_eid].to;
+      bfs_graph[bfs_graph_start[i] + bfs_graph_outdegree[i]++] = rev_eid ^ 1;
+    }
+  }
+
+  FlowType dfs(int current, FlowType prefix_cap) {
+    if (current == sink_id_) return prefix_cap;
+
+    while (bfs_graph_outdegree[current]) {
+      int eid = bfs_graph[bfs_graph_start[current] +
+                          bfs_graph_outdegree[current] - 1];
+      Edge &edge = edge_list[eid];
       int next = edge.to;
 
       if (vis[next]) {
-        bfs_graph[current].pop_back();
+        --bfs_graph_outdegree[current];
         continue;
       }
 
       if (!edge.cap) {
-        bfs_graph[current].pop_back();
+        --bfs_graph_outdegree[current];
         continue;
       }
 
-      FlowType here = dfs(next, target, std::min(prefix_cap, edge.cap));
+      FlowType here = dfs(next, std::min(prefix_cap, edge.cap));
       if (!here) {
-        bfs_graph[current].pop_back();
+        --bfs_graph_outdegree[current];
         continue;
       }
 
       edge.cap -= here;
-      edge_list[bfs_graph[current].back()^1].cap += here;
+      edge_list[eid ^ 1].cap += here;
 
       if (!edge.cap) {
-        bfs_graph[current].pop_back();
-        if (bfs_graph[current].size() == 0)
-          vis[current] = 1;
+        if (!--bfs_graph_outdegree[current]) vis[current] = 1;
       }
 
       return here;
