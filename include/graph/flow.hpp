@@ -1,11 +1,13 @@
 #pragma once
 
 #include <local_assertion.hpp>
+#include <utils.hpp>
 
 #include <algorithm>
 #include <array>
 #include <limits>
 #include <numeric>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -97,7 +99,7 @@ struct LayeredNodeNameTranslator {
   }
 };
 
-template <class FlowType = long long,
+template <class FlowType = long long, bool shuffle = false,
           class NodeNameTranslator = LayeredNodeNameTranslator>
 class Flow {
   struct EdgeReference {
@@ -132,7 +134,7 @@ class Flow {
   };
 
   std::vector<Edge> edge_list;
-  std::vector<std::vector<int>> graph;
+  std::vector<std::basic_string<int>> graph;
   std::vector<int> bfs_graph, bfs_graph_outdegree, bfs_graph_start, queue,
       used_edge;
 
@@ -205,11 +207,13 @@ class Flow {
     source_id_ = source_id;
     sink_id_ = sink_id;
 
-    int steps = 0;
+    if constexpr (shuffle)
+      for (auto &adj_list : graph)
+        std::shuffle(adj_list.begin(), adj_list.end(), rng);
 
     FlowType ans = 0;
     FlowType to_add;
-    while ((to_add = blocking_flow())) ans += to_add, ++steps;
+    while ((to_add = blocking_flow())) ans += to_add;
 
     return ans;
   }
@@ -238,13 +242,11 @@ class Flow {
   FlowType blocking_flow() {
     init_bfs_graph();
 
-    int steps = 0;
-
     FlowType ans = 0;
     FlowType to_add;
     while ((to_add =
                 dfs(source_id_, std::numeric_limits<FlowType>::max())))
-      ans += to_add, ++steps;
+      ans += to_add;
 
     return ans;
   }
