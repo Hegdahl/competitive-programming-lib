@@ -19,21 +19,26 @@ void tcase() {
     where[a[i]] = i;
  
   // s l m1 m2 r t
+  enum Layer {
+    ST, L, M1, M2, R
+  };
   
-  Flow<int> flow(1, n, n, n, n, 1);
+  int S = 0;
+  int T = 1;
+  Flow<int> flow(2, n, n, n, n);
  
   auto add_edge = [&](int x, int y) {
     int i = where[x];
     int j = where[y];
     if (i == -1 || j == -1) return;
-    flow(1, i)(2, j) = 1;
-    flow(3, i)(4, j) = 1;
+    flow(L, i)(M1, j) = 1;
+    flow(M2, i)(R, j) = 1;
   };
  
   for (int i = 0; i < n; ++i) {
-    flow(0, 0)(1, i) = 1;
-    flow(2, i)(3, i) = 1;
-    flow(4, i)(5, 0) = 1;
+    flow(S)(L, i) = 1;
+    flow(M1, i)(M2, i) = 1;
+    flow(R, i)(T) = 1;
  
     if (a[i] != 1)
       add_edge(a[i], 1);
@@ -46,7 +51,7 @@ void tcase() {
     }
   }
  
-  std::cout << flow(0, 0)(5, 0).max_flow() << '\n';
+  std::cout << flow(S)(T).max_flow() << '\n';
  
   for (int x : a)
     where[x] = -1;
