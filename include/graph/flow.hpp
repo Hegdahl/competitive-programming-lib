@@ -2,6 +2,7 @@
 
 #include <local_assertion.hpp>
 #include <utils.hpp>
+#include <container/any_map.hpp>
 
 #include <algorithm>
 #include <array>
@@ -96,6 +97,19 @@ struct LayeredNodeNameTranslator {
           return begin <= index && index < end;
         };
     return std::make_pair(from_list, is_in_to_layer);
+  }
+};
+
+struct AnyNodeNameTranslator {
+  AnyMap<int> mp;
+  int next_node_id;
+  AnyNodeNameTranslator() : mp(-1), next_node_id(0) {}
+
+  template <class... Args>
+  int to_id(Args &&...args) {
+    int &v = mp(std::forward<Args>(args)...);
+    if (v == -1) v = next_node_id++;
+    return v;
   }
 };
 
