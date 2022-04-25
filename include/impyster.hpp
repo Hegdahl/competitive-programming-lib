@@ -9,6 +9,8 @@
 #include <impyster/zip.hpp>
 #include <iostream>
 
+namespace impyster {
+
 struct {
   template<class T>
   operator T() {
@@ -17,3 +19,5 @@ struct {
     return x;
   }
 } in;
+
+} // namespace impyster
