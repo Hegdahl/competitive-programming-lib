@@ -27,3 +27,12 @@ template<class...Ts>
 struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
+
+struct {
+  template<class T>
+  operator T() {
+    T x;
+    std::cin >> x;
+    return x;
+  }
+} in;

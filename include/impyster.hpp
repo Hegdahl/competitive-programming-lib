@@ -8,16 +8,3 @@
 #include <impyster/range.hpp>
 #include <impyster/zip.hpp>
 #include <iostream>
-
-namespace impyster {
-
-struct {
-  template<class T>
-  operator T() {
-    T x;
-    std::cin >> x;
-    return x;
-  }
-} in;
-
-} // namespace impyster
