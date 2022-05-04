@@ -107,14 +107,15 @@ struct AnyNodeNameTranslator {
   }
 };
 
-template <class FlowType = long long, bool shuffle = false,
+template <class FlowType = long long, class CapType = FlowType,
+          bool shuffle = false,
           class NodeNameTranslator = LayeredNodeNameTranslator>
 class Flow {
   struct EdgeReference {
     Flow &flow;
     int i, j;
 
-    void operator=(FlowType w) { flow.make_edge(i, j, w); }
+    void operator=(CapType w) { flow.make_edge(i, j, w); }
 
     FlowType max_flow() { return flow.max_flow(i, j); }
   };
@@ -137,7 +138,7 @@ class Flow {
   Flow(Args &&...args) : node_name_translator(std::forward<Args>(args)...) {}
 
   std::vector<int> to;
-  std::vector<FlowType> cap;
+  std::vector<CapType> cap;
   std::vector<std::basic_string<int>> graph;
   std::vector<int> bfs_graph, bfs_graph_outdegree, bfs_graph_start, queue,
       used_edge;
@@ -151,18 +152,18 @@ class Flow {
   }
 
   template <class... Args>
-  std::vector<std::tuple<int, int, FlowType, FlowType>> get_edge_group(int x,
+  std::vector<std::tuple<int, int, CapType, CapType>> get_edge_group(int x,
                                                                        int y) {
     auto [from, is_to] = node_name_translator.get_edge_group_descriptor(x, y);
 
-    std::vector<std::tuple<int, int, FlowType, FlowType>> res;
+    std::vector<std::tuple<int, int, CapType, CapType>> res;
     for (int i : from) {
       for (int eid : graph[i]) {
         int j = to[eid];
         if (!is_to(j)) continue;
 
-        FlowType current_flow = cap[eid ^ 1];
-        FlowType capacity = cap[eid] + current_flow;
+        CapType current_flow = cap[eid ^ 1];
+        CapType capacity = cap[eid] + current_flow;
         res.emplace_back(i, j, current_flow, capacity);
       }
     }
@@ -182,7 +183,7 @@ class Flow {
    * @param to_id   The ending node of the edge
    * @param weight  The capacity of the edge
    */
-  void make_edge(int from_id, int to_id, FlowType weight) {
+  void make_edge(int from_id, int to_id, CapType weight) {
     LOCAL_ASSERT(from_id != to_id, "Self-loops are not supported.")
 
     expand_graph(std::max(from_id, to_id) + 1);
@@ -249,7 +250,7 @@ class Flow {
 
     FlowType ans = 0;
     FlowType to_add;
-    while ((to_add = dfs(source_id_, std::numeric_limits<FlowType>::max())))
+    while ((to_add = dfs(source_id_, std::numeric_limits<CapType>::max())))
       ans += to_add;
 
     return ans;
@@ -332,7 +333,7 @@ class Flow {
     }
   }
 
-  FlowType dfs(int current, FlowType prefix_cap) {
+  FlowType dfs(int current, CapType prefix_cap) {
     if (current == sink_id_) return prefix_cap;
 
     while (bfs_graph_outdegree[current]) {
@@ -350,7 +351,7 @@ class Flow {
         continue;
       }
 
-      FlowType here = dfs(next, std::min(prefix_cap, cap[eid]));
+      CapType here = dfs(next, std::min(prefix_cap, cap[eid]));
       if (!here) {
         --bfs_graph_outdegree[current];
         continue;
