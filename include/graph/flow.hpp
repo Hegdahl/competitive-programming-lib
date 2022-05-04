@@ -36,12 +36,7 @@
 struct LayeredNodeNameTranslator {
   const std::vector<int> layer_sizes;
   const std::vector<int> layer_sizes_prefix_sum;
-  // hi! I have :floshed: idea for posets we do
-  // Poset poset(n); poset(i) < poset(j); makes edge i -> j,
-  // and all other implied edges
-
-  // orz idea :happiness:
-  // ur writing too wide lol i can't scroll that far for some reason
+  
   template <class... Args>
   LayeredNodeNameTranslator(Args &&...args)
       : layer_sizes{std::forward<Args>(args)...},
@@ -141,12 +136,8 @@ class Flow {
   template <class... Args>
   Flow(Args &&...args) : node_name_translator(std::forward<Args>(args)...) {}
 
-  struct Edge {
-    int to;
-    FlowType cap;
-  };
-
-  std::vector<Edge> edge_list;
+  std::vector<int> to;
+  std::vector<FlowType> cap;
   std::vector<std::basic_string<int>> graph;
   std::vector<int> bfs_graph, bfs_graph_outdegree, bfs_graph_start, queue,
       used_edge;
@@ -167,12 +158,11 @@ class Flow {
     std::vector<std::tuple<int, int, FlowType, FlowType>> res;
     for (int i : from) {
       for (int eid : graph[i]) {
-        Edge &edge = edge_list[eid];
-        int j = edge.to;
+        int j = to[eid];
         if (!is_to(j)) continue;
 
-        FlowType current_flow = edge_list[eid ^ 1].cap;
-        FlowType capacity = edge.cap + current_flow;
+        FlowType current_flow = cap[eid ^ 1];
+        FlowType capacity = cap[eid] + current_flow;
         res.emplace_back(i, j, current_flow, capacity);
       }
     }
@@ -197,10 +187,12 @@ class Flow {
 
     expand_graph(std::max(from_id, to_id) + 1);
 
-    graph[from_id].push_back(edge_list.size());
-    edge_list.emplace_back(Edge{to_id, weight});
-    graph[to_id].push_back(edge_list.size());
-    edge_list.emplace_back(Edge{from_id, 0});
+    graph[from_id].push_back(cap.size());
+    to.emplace_back(to_id);
+    cap.push_back(weight);
+    graph[to_id].push_back(cap.size());
+    to.push_back(from_id);
+    cap.push_back(0);
   }
 
   /**
@@ -288,9 +280,8 @@ class Flow {
       if (i == sink_id_) break;
 
       for (int eid : graph[i]) {
-        Edge &edge = edge_list[eid];
-        if (!edge.cap) continue;
-        int j = edge.to;
+        if (!cap[eid]) continue;
+        int j = to[eid];
 
         if (vis[j]) continue;
 
@@ -317,8 +308,8 @@ class Flow {
       if (vis[j]) continue;
 
       for (int eid : graph[j]) {
-        if (!edge_list[eid ^ 1].cap) continue;
-        int i = edge_list[eid].to;
+        if (!cap[eid ^ 1]) continue;
+        int i = to[eid];
         if (dist[i] + 1 != dist[j]) continue;
 
         vis[i] = 0;
@@ -336,7 +327,7 @@ class Flow {
     while (used_edge.size()) {
       int rev_eid = used_edge.back();
       used_edge.pop_back();
-      int i = edge_list[rev_eid].to;
+      int i = to[rev_eid];
       bfs_graph[bfs_graph_start[i] + bfs_graph_outdegree[i]++] = rev_eid ^ 1;
     }
   }
@@ -347,29 +338,28 @@ class Flow {
     while (bfs_graph_outdegree[current]) {
       int eid = bfs_graph[bfs_graph_start[current] +
                           bfs_graph_outdegree[current] - 1];
-      Edge &edge = edge_list[eid];
-      int next = edge.to;
+      int next = to[eid];
 
       if (vis[next]) {
         --bfs_graph_outdegree[current];
         continue;
       }
 
-      if (!edge.cap) {
+      if (!cap[eid]) {
         --bfs_graph_outdegree[current];
         continue;
       }
 
-      FlowType here = dfs(next, std::min(prefix_cap, edge.cap));
+      FlowType here = dfs(next, std::min(prefix_cap, cap[eid]));
       if (!here) {
         --bfs_graph_outdegree[current];
         continue;
       }
 
-      edge.cap -= here;
-      edge_list[eid ^ 1].cap += here;
+      cap[eid] -= here;
+      cap[eid ^ 1] += here;
 
-      if (!edge.cap) {
+      if (!cap[eid]) {
         if (!--bfs_graph_outdegree[current]) vis[current] = 1;
       }
 
