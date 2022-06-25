@@ -24,6 +24,7 @@ struct SegTree {
   std::vector<S> values;
   std::vector<F> lazy;
 
+  SegTree() {}
   SegTree(int n_) : n(n_), offset(2<<std::__lg(n-1)) {
     values.resize(2*offset);
     if constexpr (is_lazy) lazy.resize(offset);
