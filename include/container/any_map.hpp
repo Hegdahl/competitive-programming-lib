@@ -4,7 +4,7 @@
 #include <tuple>
 #include <utility>
 
-template<class T>
+template <class T>
 class AnyMap {
   static int instance_count;
   const int instance_id_;
@@ -12,7 +12,8 @@ class AnyMap {
 
  public:
   AnyMap(T default_value = T())
-      : instance_id_(instance_count++), default_value_(std::move(default_value)) {}
+      : instance_id_(instance_count++),
+        default_value_(std::move(default_value)) {}
 
   template <class... Args>
   auto &operator()(Args &&...args) {
@@ -20,11 +21,12 @@ class AnyMap {
         decltype(std::make_tuple(instance_id_, std::forward<Args>(args)...));
     static std::map<Tuple, T> map;
 
-    auto [it, placed] = map.emplace(
-        Tuple{instance_id_, std::forward<Args>(args)...}, default_value_);
+    auto it = map.emplace(Tuple{instance_id_, std::forward<Args>(args)...},
+                          default_value_)
+                  .first;
     return it->second;
   }
 };
 
-template<class T>
+template <class T>
 int AnyMap<T>::instance_count = 0;

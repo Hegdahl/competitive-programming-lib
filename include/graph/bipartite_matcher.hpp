@@ -9,7 +9,7 @@
  *    minimum vertex cover of bipartite graph
  */
 struct BipartiteMatcher {
-  Flow<int> internal_flow;
+  Flow<int, int, true> internal_flow;
   int n_l, n_r;
 
   BipartiteMatcher(int n_l, int n_r)
@@ -30,8 +30,12 @@ struct BipartiteMatcher {
     std::vector<std::array<int, 2>> matching(matching_size);
     auto it = matching.begin();
 
-    for (const auto &[u, v, flow, cap] : internal_flow.get_edge_group(1, 2))
+    for (const auto &pack : internal_flow.get_edge_group(1, 2)) {
+      auto &u = std::get<0>(pack);
+      auto &v = std::get<1>(pack);
+      auto &flow = std::get<2>(pack);
       if (flow > 0) *(it++) = std::array<int, 2>({u, v});
+    }
 
     for (auto &e : matching)
       for (auto &v : e) v = internal_flow.node_name_translator.from_id(v)[1];
@@ -43,9 +47,12 @@ struct BipartiteMatcher {
     auto M = get_matching();
     std::vector<int> cover(M.size());
     std::vector<uint8_t> vis(n_l + n_r);
-    for (auto &[u, v] : M) vis[u] = 1;
+    for (auto &e : M) vis[e[0]] = 1;
     std::vector<std::vector<int>> g(n_l + n_r);
-    for (auto &[u, v, flow, cap] : internal_flow.get_edge_group(1, 2)) {
+    for (auto &pack : internal_flow.get_edge_group(1, 2)) {
+      auto &u = std::get<0>(pack);
+      auto &v = std::get<1>(pack);
+      auto &flow = std::get<2>(pack);
       if (flow)
         g[v + n_l].push_back(u);
       else
@@ -66,7 +73,9 @@ struct BipartiteMatcher {
       }
     }
 
-    for (auto &[u, v] : M) {
+    for (auto &pack : M) {
+      auto &u = pack[0];
+      auto &v = pack[0];
       if (vis[v])
         cover.push_back(v);
       else

@@ -20,7 +20,7 @@ class undo_vector : public std::vector<T> {
       return *this;
     }
 
-    operator T&() {
+    operator const T&() const {
       return u.std::vector<T>::operator[](i);
     }
   };

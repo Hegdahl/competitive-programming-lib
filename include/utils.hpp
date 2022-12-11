@@ -25,10 +25,12 @@ struct r_hash {
   }
 };
 
+#if __cplusplus >= 201703L
 template<class...Ts>
 struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
+#endif
 
 template<class Fun>
 class y_combinator_result {

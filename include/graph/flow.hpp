@@ -36,7 +36,7 @@
 struct LayeredNodeNameTranslator {
   const std::vector<int> layer_sizes;
   const std::vector<int> layer_sizes_prefix_sum;
-  
+
   template <class... Args>
   LayeredNodeNameTranslator(Args &&...args)
       : layer_sizes{std::forward<Args>(args)...},
@@ -117,7 +117,8 @@ class Flow {
 
     void operator=(CapType w) { flow.make_edge(i, j, w); }
 
-    FlowType max_flow() { return flow.max_flow(i, j); }
+    decltype(auto) max_flow() { return flow.max_flow(i, j); }
+    decltype(auto) min_cut() { return flow.min_cut(i, j); }
   };
 
   struct NodeReference {
@@ -153,8 +154,11 @@ class Flow {
 
   template <class... Args>
   std::vector<std::tuple<int, int, CapType, CapType>> get_edge_group(int x,
-                                                                       int y) {
-    auto [from, is_to] = node_name_translator.get_edge_group_descriptor(x, y);
+                                                                     int y) {
+    auto group_descriptor =
+        node_name_translator.get_edge_group_descriptor(x, y);
+    auto &from = group_descriptor.first;
+    auto &is_to = group_descriptor.second;
 
     std::vector<std::tuple<int, int, CapType, CapType>> res;
     for (int i : from) {
@@ -222,6 +226,24 @@ class Flow {
     while ((to_add = blocking_flow())) ans += to_add;
 
     return ans;
+  }
+
+  std::vector<std::array<int, 2>> min_cut(int source_id, int sink_id) {
+    max_flow(source_id, sink_id);
+    reset_bfs_graph();
+    forward_bfs();
+
+    std::vector<std::array<int, 2>> res;
+    for (int i = 0; i < (int)graph.size(); ++i) {
+      for (int eid : graph[i]) {
+        if (eid & 1) continue;
+        int j = to[eid];
+        if (vis[i] && !vis[j]) {
+          res.push_back({i, j});
+        }
+      }
+    }
+    return res;
   }
 
  private:

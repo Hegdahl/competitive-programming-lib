@@ -22,7 +22,7 @@ struct UFDS {
     if (i == j) return false;
     if (-a[i] < -a[j])
       std::swap(i, j);
-    a[i] += a[j];
+    a[i] = a[i] + a[j];
     a[j] = i;
     return true;
   }

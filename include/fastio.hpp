@@ -123,7 +123,9 @@ struct IO {
   };
 
   inline void load() {
-    memcpy(std::begin(input_buffer), std::begin(input_buffer) + input_ptr_left,
+    //memcpy(std::begin(input_buffer), std::begin(input_buffer) + input_ptr_left,
+    //        input_ptr_right - input_ptr_left);
+    memmove(std::begin(input_buffer), std::begin(input_buffer) + input_ptr_left,
             input_ptr_right - input_ptr_left);
     input_ptr_right =
         input_ptr_right - input_ptr_left +
