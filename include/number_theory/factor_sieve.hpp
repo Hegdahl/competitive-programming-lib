@@ -5,8 +5,8 @@
 template<int N>
 struct FactorSieve {
   static constexpr int max_primes = int(1.6 * N / (int)std::__lg(N+1))+ 10;
-  static int smallest_factor[N+1];
-  static int primes[max_primes+1];
+  int smallest_factor[N+1];
+  int primes[max_primes+1];
   int prime_cnt = 0;
 
   constexpr FactorSieve(int) {
@@ -31,8 +31,3 @@ struct FactorSieve {
     return res;
   }
 };
-
-template<int N>
-int FactorSieve<N>::smallest_factor[N+1];
-template<int N>
-int FactorSieve<N>::primes[FactorSieve<N>::max_primes+1];

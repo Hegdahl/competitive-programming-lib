@@ -1,7 +1,6 @@
 #pragma once
 
 #include <ints.hpp>
-
 #include <type_traits>
 #include <vector>
 
@@ -16,7 +15,7 @@
  */
 template <class T, class index_t = u32,
           i32 max_log2n = 8 * sizeof(index_t) - bool(std::is_signed_v<index_t>),
-          class Container = std::vector<T>>
+          class Container = std::vector<T>, bool init_loop = true>
 class FenwickTree {
   Container bit;
 
@@ -29,9 +28,11 @@ class FenwickTree {
    */
   template <class... Args>
   FenwickTree(Args &&...args) : bit(std::forward<Args>(args)...) {
-    for (index_t i = 0; i != size(); ++i) {
-      index_t j = i | (i + 1);
-      if (j < size()) bit[j] += bit[i];
+    if constexpr (init_loop) {
+      for (index_t i = 0; i != size(); ++i) {
+        index_t j = i | (i + 1);
+        if (j < size()) bit[j] += bit[i];
+      }
     }
   }
 
