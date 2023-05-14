@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <new>
 
 /**
  * @brief Constant optimized non-lazy segment tree
@@ -13,11 +14,11 @@ struct SIMDSegTree {
   static_assert(Group::commute);
   using T = typename Group::value_type;
 
-  static constexpr int cache_size = 64;
-  static constexpr int reg_size = 32;
+  static constexpr int cache_size = 64; // hope it's 64 for clang support... std::hardware_constructive_interference_size;
+  static constexpr int reg_size = 32;  // assuming avx2
   static constexpr int reg_count = cache_size / reg_size;
   static constexpr int branching = cache_size / sizeof(T);
-  static constexpr int branching_bits = std::__lg(branching);
+  static constexpr int branching_bits = std::bit_width(unsigned(branching)) - 1;
 
   // MUST BE TYPEDEF, NOT USING
   typedef T __attribute__((vector_size(reg_size))) vec;
@@ -91,3 +92,33 @@ struct SIMDSegTree {
     return s;
   }
 };
+
+template<class T>
+struct Add {
+  using value_type = T;
+  static constexpr bool commute = true;
+  static constexpr auto op(auto &&a, auto&&b) { return a + b; }
+  static constexpr auto inverse(auto &&a) { return -a; }
+  static constexpr auto repeat(auto &&a, long long n) { return a * n; }
+  static constexpr T id() { return 0; }
+};
+
+template<class T>
+struct Multiply {
+  using value_type = T;
+  static constexpr bool commute = true;
+  static constexpr auto op(auto &&a, auto&&b) { return a * b; }
+  static constexpr auto inverse(auto &&a) { return 1 / a; }
+  static constexpr T id() { return 1; }
+};
+
+template<class T>
+struct Xor {
+  using value_type = T;
+  static constexpr bool commute = true;
+  static constexpr auto op(auto &&a, auto&&b) { return a ^ b; }
+  static constexpr auto inverse(auto &&a) { return a; }
+  static constexpr auto repeat(auto &&a, long long n) { return a * (n & 1); }
+  static constexpr T id() { return 0; }
+};
+
